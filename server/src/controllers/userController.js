@@ -1,6 +1,6 @@
 const bcrypt = require('bcrypt');
 const User = require('../models/User');
-
+const imageService = require('../services/imageService');
 
 
 exports.getProfile = async(req, res) => {
@@ -41,15 +41,41 @@ exports.updaterProfile = async(req, res) => {
                message: 'User not found'
            });
        }
-       const updatedUser = await User.findByIdAndUpdate(userId,{
-        firstName:firstName,
-        lastName:lastName,
-        email:email,
-        },{ 
-            new: true, 
-            runValidators: true 
-         }).select('-password');
+       const updateData ={
+        firstName,
+        lastName,
+        email,
+        updatedAt: Date.now()
+       }
+       if(req.file){
+        try {
+            console.log('📷 Processing avatar upload...');
+            
+            if (user.avatarPublicId) {
+            console.log('🗑️ Deleting old avatar:', user.avatarPublicId);
+            await imageService.deleteImage(user.avatarPublicId);
+            console.log('⬆️ Uploading new avatar...');
+            const uploadResult = await imageService.uploadImage(req.file.buffer, 'avatars');
+        
+            console.log('✅ Avatar upload result:', uploadResult);
+            
+            updateData.avatar = uploadResult.secure_url;
+            updateData.avatarPublicId = uploadResult.public_id;
+            }
+        } catch (uploadError) {
+            console.error('❌ Avatar upload error:', uploadError);
+            return res.status(400).json({
+                success: false,
+                message: 'Failed to upload avatar image'
+            });
+        }
+       }
+       const updatedUser = await User.findByIdAndUpdate(userId,
+        updateData,
+        { new: true, select: '-password' }
+       );
 
+        
         return res.status(200).json({
             success: true,
             message: 'Profile updated successfully',
@@ -112,5 +138,49 @@ try {
 
 
 }
+
+exports.uploadAvatar = async(req, res) => {
+ try {
+    if(!req.file){
+        return res.status(400).json({
+            success: false,
+            message: 'No file uploaded'
+        });
+    }
+    const userId = req.user.id;
+    const currentUser = await User.findById(userId);
+
+    if(!currentUser){
+        return res.status(404).json({
+            success: false,
+            message: 'User not found'
+        });
+    }
+    if (currentUser.avatarPublicId) {
+      await imageService.deleteImage(currentUser.avatarPublicId);
+    }
+    const uploadResult = await imageService.uploadImage(req.file.buffer, 'avatars');
+    const updatedUser = await User.findByIdAndUpdate(userId,{
+        avatar: uploadResult.secure_url,
+        avatarPublicId: uploadResult.public_id,
+        updatedAt: Date.now()
+    },
+    { new: true,select: '-password' });
+    return res.status(200).json({
+        success: true,
+        message: 'Avatar uploaded successfully',
+        user: updatedUser
+    });
+ } catch (error) {
+     console.error('Error uploading avatar:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while uploading avatar'
+    });
+ }
+
+}
+
+
 
 

@@ -14,6 +14,31 @@ const userSchema = new mongoose.Schema({
         enum:['student','instructor','admin'],
         
     },
+    phone: {
+    type: String,
+    trim: true,
+    },
+    bio: {
+        type: String,
+        maxlength: 500,
+    },
+    location: {
+        type: String,
+        trim: true,
+    },
+    website: {
+        type: String,
+        trim: true,
+    },
+    
+    avatar: {
+        type: String, 
+        default: null,
+    },
+    avatarPublicId: {
+        type: String, 
+        default: null,
+    },
 
 },{
     timestamps:true

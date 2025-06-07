@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../../stores/authStore";
 import authService from "../../services/authService";
@@ -21,6 +21,12 @@ function Profile() {
     location: "",
     website: "",
   });
+  const [showPasswords, setShowPasswords] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false,
+  });
+
   const [isLoadingSave, setIsLoadingSave] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
@@ -32,6 +38,10 @@ function Profile() {
   });
   const [isLoadingPassword, setIsLoadingPassword] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState({});
+
+  // Avatar upload state
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -226,6 +236,66 @@ function Profile() {
     }
   };
 
+  // ✅ Add avatar upload handler
+  const handleAvatarUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      showToast(
+        "Please select a valid image file (JPEG, PNG, GIF, WebP)",
+        "error"
+      );
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Image size must be less than 5MB", "error");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+
+    try {
+      const result = await authService.uploadAvatar(file);
+
+      if (result.success) {
+        // Update the store with new user data
+        
+        updateUser(result.user);
+        showToast("Profile picture updated successfully!", "success");
+      } else {
+        showToast(
+          result.message || "Failed to upload profile picture",
+          "error"
+        );
+      }
+    } catch (error) {
+      console.error("Avatar upload error:", error);
+      showToast("Network error. Please try again.", "error");
+    } finally {
+      setIsUploadingAvatar(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // ✅ Add click handler for avatar button
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const showToast = (message, type = "info") => {
     const existingToasts = document.querySelectorAll(".custom-toast");
     existingToasts.forEach((toast) => {
@@ -274,7 +344,12 @@ function Profile() {
       }
     }, dismissTime);
   };
-
+  const togglePasswordVisibility = (field) => {
+    setShowPasswords((prev) => ({
+      ...prev,
+      [field]: !prev[field],
+    }));
+  };
   const tabs = [
     {
       id: "profile",
@@ -389,31 +464,50 @@ function Profile() {
                           "https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp"
                         }
                         alt="Profile"
-                        className="rounded-full"
+                        className="rounded-full object-cover"
                       />
                     </div>
                   </div>
-                  <button className="btn btn-circle btn-primary btn-sm absolute bottom-2 right-8 shadow-lg hover:scale-110 transition-transform duration-300">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
+
+                  {/* Updated camera button with upload functionality */}
+                  <button
+                    onClick={handleAvatarClick}
+                    disabled={isUploadingAvatar}
+                    className="btn btn-circle btn-primary btn-sm absolute bottom-2 right-8 shadow-lg hover:scale-110 transition-transform duration-300"
+                  >
+                    {isUploadingAvatar ? (
+                      <span className="loading loading-spinner loading-xs"></span>
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                    )}
                   </button>
+
+                  {/* Hidden file input */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleAvatarUpload}
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    className="hidden"
+                  />
                 </div>
 
                 {/* User Info */}
@@ -785,26 +879,74 @@ function Profile() {
                           onSubmit={handlePasswordChange}
                           className="grid grid-cols-1 gap-4"
                         >
+                          {/* Current Password */}
                           <div className="form-control w-full">
                             <label className="label">
                               <span className="label-text font-semibold text-base">
                                 Current Password
                               </span>
                             </label>
-                            <input
-                              type="password"
-                              name="currentPassword"
-                              value={passwordData.currentPassword}
-                              onChange={handlePasswordInputChange}
-                              className={`input input-bordered w-full rounded-xl focus:input-primary transition-all duration-300 ${
-                                passwordErrors.currentPassword
-                                  ? "input-error"
-                                  : ""
-                              }`}
-                              placeholder="Enter current password"
-                              
-                              
-                            />
+                            <div className="relative">
+                              <input
+                                type={
+                                  showPasswords.currentPassword
+                                    ? "text"
+                                    : "password"
+                                }
+                                name="currentPassword"
+                                value={passwordData.currentPassword}
+                                onChange={handlePasswordInputChange}
+                                className={`input input-bordered w-full pr-12 rounded-xl focus:input-primary transition-all duration-300 ${
+                                  passwordErrors.currentPassword
+                                    ? "input-error"
+                                    : ""
+                                }`}
+                                placeholder="Enter current password"
+                              />
+                              <button
+                                type="button"
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/50 hover:text-base-content transition-colors"
+                                onClick={() =>
+                                  togglePasswordVisibility("currentPassword")
+                                }
+                              >
+                                {showPasswords.currentPassword ? (
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                    />
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
                             {passwordErrors.currentPassword && (
                               <label className="label">
                                 <span className="label-text-alt text-error">
@@ -814,25 +956,74 @@ function Profile() {
                             )}
                           </div>
 
+                          {/* New Password */}
                           <div className="form-control w-full">
                             <label className="label">
                               <span className="label-text font-semibold text-base">
                                 New Password
                               </span>
                             </label>
-                            <input
-                              type="password"
-                              name="newPassword"
-                              value={passwordData.newPassword}
-                              onChange={handlePasswordInputChange}
-                              className={`input input-bordered w-full rounded-xl focus:input-primary transition-all duration-300 ${
-                                passwordErrors.newPassword ? "input-error" : ""
-                              }`}
-                              placeholder="Enter new password"
-                              
-                              
-                              
-                            />
+                            <div className="relative">
+                              <input
+                                type={
+                                  showPasswords.newPassword
+                                    ? "text"
+                                    : "password"
+                                }
+                                name="newPassword"
+                                value={passwordData.newPassword}
+                                onChange={handlePasswordInputChange}
+                                className={`input input-bordered w-full pr-12 rounded-xl focus:input-primary transition-all duration-300 ${
+                                  passwordErrors.newPassword
+                                    ? "input-error"
+                                    : ""
+                                }`}
+                                placeholder="Enter new password"
+                              />
+                              <button
+                                type="button"
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/50 hover:text-base-content transition-colors"
+                                onClick={() =>
+                                  togglePasswordVisibility("newPassword")
+                                }
+                              >
+                                {showPasswords.newPassword ? (
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                    />
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
                             <label className="label">
                               <span className="label-text-alt text-base-content/60">
                                 Must be at least 6 characters with uppercase,
@@ -848,25 +1039,74 @@ function Profile() {
                             )}
                           </div>
 
+                          {/* Confirm New Password */}
                           <div className="form-control w-full">
                             <label className="label">
                               <span className="label-text font-semibold text-base">
                                 Confirm New Password
                               </span>
                             </label>
-                            <input
-                              type="password"
-                              name="confirmPassword"
-                              value={passwordData.confirmPassword}
-                              onChange={handlePasswordInputChange}
-                              className={`input input-bordered w-full rounded-xl focus:input-primary transition-all duration-300 ${
-                                passwordErrors.confirmPassword
-                                  ? "input-error"
-                                  : ""
-                              }`}
-                              placeholder="Confirm new password"
-                             
-                            />
+                            <div className="relative">
+                              <input
+                                type={
+                                  showPasswords.confirmPassword
+                                    ? "text"
+                                    : "password"
+                                }
+                                name="confirmPassword"
+                                value={passwordData.confirmPassword}
+                                onChange={handlePasswordInputChange}
+                                className={`input input-bordered w-full pr-12 rounded-xl focus:input-primary transition-all duration-300 ${
+                                  passwordErrors.confirmPassword
+                                    ? "input-error"
+                                    : ""
+                                }`}
+                                placeholder="Confirm new password"
+                              />
+                              <button
+                                type="button"
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/50 hover:text-base-content transition-colors"
+                                onClick={() =>
+                                  togglePasswordVisibility("confirmPassword")
+                                }
+                              >
+                                {showPasswords.confirmPassword ? (
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                    />
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
                             {passwordErrors.confirmPassword && (
                               <label className="label">
                                 <span className="label-text-alt text-error">
