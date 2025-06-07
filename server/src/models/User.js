@@ -8,7 +8,12 @@ const userSchema = new mongoose.Schema({
         type:String,
         required:true,
         unique:true,
-    }
+    },
+    role:{
+        type:String,
+        enum:['student','instructor','admin'],
+        
+    },
 
 },{
     timestamps:true
@@ -24,6 +29,22 @@ userSchema.pre('save', async function(next) {
         next(error);
      }
 
+});
+userSchema.pre(['findOneAndUpdate', 'updateOne'], async function(next) {
+    try {
+        // Check if password is being updated
+        const update = this.getUpdate();
+        
+        if (update.password) {
+            // Hash the new password
+            const hashedPassword = await bcrypt.hash(update.password, 12);
+            this.setUpdate({ ...update, password: hashedPassword });
+        }
+        
+        next();
+    } catch (error) {
+        next(error);
+    }
 });
 
 userSchema.methods.comparePassword = async function(candidatePassword) {

@@ -3,20 +3,30 @@ const cors = require('cors');
 const session = require('express-session'); // ✅ Install: npm install express-session
 const connectDB = require('./src/config/database');
 require('dotenv').config();
-
+const MongoStore = require('connect-mongo');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ Session middleware (MUST come before passport)
+
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
-    resave: false,           // Don't save session if unmodified
-    saveUninitialized: false, // Don't create session until something stored
+    resave: false,           
+    saveUninitialized: false,
+    
+    store: MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    touchAfter: 24 * 3600, 
+    ttl: 7 * 24 * 60 * 60, 
+  }),
+    
     cookie: {
-        secure: false,       // Set to true in production with HTTPS
-        httpOnly: true,      // Prevent XSS attacks
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    }
+        secure: process.env.NODE_ENV === 'production',       // Set to true in production with HTTPS
+        httpOnly: true,      
+        maxAge: 24 * 60 * 60 * 1000 ,
+        sameSite: 'strict', 
+    },
+  
+    name: 'classroom.sid', 
 }));
 
 // ✅ Import and initialize passport (AFTER session)
@@ -39,6 +49,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 //Auth Routes
     const authRoutes = require('./src/routes/authRoutes');
     app.use('/api/auth', authRoutes);
+//User Routes
+    const userRoutes = require('./src/routes/userRoutes'); 
+    app.use('/api/users', userRoutes);
 // Test route
 app.get('/', (req, res) => {
     res.json({ 

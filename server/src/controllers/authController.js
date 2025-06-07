@@ -52,11 +52,21 @@ exports.logout = (req, res) => {
                 message: 'Logout error' 
             });
         }
-        
-        res.json({ 
-            success: true, 
-            message: 'Logged out successfully' 
+         req.session.destroy((err) => {
+            if (err) {
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Session destruction error' 
+                });
+            }
+            
+            res.clearCookie('classroom.sid'); 
+            res.json({ 
+                success: true, 
+                message: 'Logged out successfully' 
+            });
         });
+       
     });
 };
 exports.getMe = (req, res) => {
@@ -77,7 +87,7 @@ exports.getMe = (req, res) => {
 
 exports.register = async (req, res) => {
 try {
-        const { firstName, lastName, email, password } = req.body;
+        const { firstName, lastName, email, password ,role} = req.body;
         
        
         const existingUser = await User.findOne({ email });
@@ -93,21 +103,35 @@ try {
             firstName,
             lastName,
             email,
-            password 
+            password,
+            role
         });
         
         await newUser.save();
         
-        res.status(201).json({
-            success: true,
-            message: 'User registered successfully',
-            user: {
-                id: newUser._id,
-                firstName: newUser.firstName,
-                lastName: newUser.lastName,
-                email: newUser.email
+         req.logIn(newUser, (err) => {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Registration successful but login failed'
+                });
             }
-        });
+            
+            
+            res.status(201).json({
+                success: true,
+                message: 'User registered successfully',
+                user: {
+                    id: newUser._id,
+                    firstName: newUser.firstName,
+                    lastName: newUser.lastName,
+                    email: newUser.email,
+                    role: newUser.role
+                }
+             })
+            });
+        
+        
         
     } catch (error) {
         res.status(400).json({
@@ -116,3 +140,4 @@ try {
         });
     }
 };
+
